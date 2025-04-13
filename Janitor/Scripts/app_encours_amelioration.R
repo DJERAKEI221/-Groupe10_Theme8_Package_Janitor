@@ -3,13 +3,14 @@
 # 1. Installation des packages (si nécessaire) ----
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
-  shiny, shinyjs, janitor, DT, ggplot2, plotly, beepr,
+  shiny, shinyjs, janitor, DT, ggplot2, plotly, beepr, tinytex, knitr,rmarkdown,
   readxl, dplyr, tidyr, forcats, haven, jsonlite, data.table, rio,
   shinyWidgets, shinycssloaders, fontawesome, writexl, readr, bslib, lubridate, stringr
 )
 
-memory.limit(size = 16000)  # 16 Go, ajuste selon ta RAM
-
+# Dans app.R, en début de fichier (avant shinyApp())
+options(future.globals.maxSize = 16000 * 1024^2)  # 16GB en bytes
+gc()  # Nettoyage mémoire
 
 # 2. Interface utilisateur (UI) ----
 ui <- navbarPage(
@@ -19,11 +20,19 @@ ui <- navbarPage(
   ),
   windowTitle = "Janitor - Nettoyage de données",
   collapsible = TRUE,
-  theme = bslib::bs_theme(version = 5, bootswatch = "flatly"),
+  theme = bslib::bs_theme(
+    version = 5,
+    bootswatch = "flatly",
+    base_font = font_google("Roboto"),
+    heading_font = font_google("Roboto"),
+    "nav-tab-font-size" = "1.1rem",
+    "nav-link-padding-y" = "1.5rem"
+  ),
   header = tags$head(
     tags$style(HTML("
-      .navbar-brand { display: flex; align-items: center; font-weight: 600; }
-      .well-panel { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+      .navbar-brand { display: flex; align-items: center; font-weight: 600; font-size: 30px;}
+      .container-fluid {font-size: 20px;}
+      .well-panel { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px;}
       .btn-action { width: 100%; margin-bottom: 10px; }
       .file-input-container { border: 2px dashed #ddd; border-radius: 8px; padding: 20px; text-align: center; background: #f8f9fa; transition: all 0.3s; }
       .file-input-container:hover { border-color: #3498db; background: #f0f8ff; }
@@ -241,6 +250,22 @@ ui <- navbarPage(
                    )
                )
            )
+  ), 
+  
+  # Onglet Rapport
+  # Onglet Rapport HTML
+  tabPanel("Rapport", icon = icon("file-alt"),
+           div(class = "container-fluid",
+               div(class = "row",
+                   column(6,
+                          div(class = "well-panel",
+                              h4(icon("file-alt"), "Générer un rapport HTML"),
+                              textInput("report_title", "Titre du rapport", "Rapport de nettoyage"),
+                              textAreaInput("report_notes", "Notes additionnelles", "", rows = 4),
+                              downloadButton("download_report", "Télécharger le rapport")                          )
+                   )
+               )
+           )
   ),
   
   # Footer
@@ -255,15 +280,87 @@ ui <- navbarPage(
 # 3. Serveur ----
 server <- function(input, output, session) {
   
-  # Valeurs réactives
+  # Fonction helper pour créer des listes safe
+  safe_list <- function(...) {
+    elements <- list(...)
+    elements[lengths(elements) > 0]  # Ne garde que les éléments non-vides
+  }
+  
+  observeEvent(input$compare_df, {
+    req(rv$raw_data, rv$clean_data)
+    tryCatch({
+      rv$comparison_data <- safe_list(
+        comparison = janitor::compare_df_cols(rv$raw_data, rv$clean_data),
+        stats = if(nrow(rv$raw_data) > 0) list(
+          rows_raw = nrow(rv$raw_data),
+          rows_clean = nrow(rv$clean_data)
+        )
+      )
+      showNotification("Comparaison effectuée", type = "message")
+    }, error = function(e) {
+      showNotification(paste("Erreur:", e$message), type = "error")
+    })
+  })
+  
   rv <- reactiveValues(
-    raw_data = NULL,
-    clean_data = NULL,
-    tabyl_data = NULL,
-    dupes_data = NULL,
-    comparison_data = NULL
+    data = data.frame(),  # Toujours initialiser avec une structure vide appropriée
+    results = list(valid = TRUE),  # Liste avec élément par défaut
+    logs = character(0)   # Vecteur vide pour les logs
   )
   
+  log_action <- function(message) {
+    if (!is.null(message) && is.character(message) && nzchar(message)) {
+      rv$logs <- c(rv$logs, paste(Sys.time(), "-", message))
+    }
+  }
+  
+  observeEvent(input$process_data, {
+    req(input$file_input)  # Vérifie que l'input existe
+    
+    tryCatch({
+      # Lecture sécurisée des données
+      raw_data <- read.csv(input$file_input$datapath)
+      
+      # Vérification du contenu
+      if(nrow(raw_data) > 0) {
+        # Création de liste avec vérification
+        processed <- list(
+          metadata = list(
+            rows = nrow(raw_data),
+            cols = ncol(raw_data)
+          ),
+          # Élément conditionnel
+          samples = if(nrow(raw_data) > 5) head(raw_data, 5) else NULL
+        )
+        
+        # Filtrage des éléments NULL avant assignation
+        rv$results <- processed[!sapply(processed, is.null)]
+        
+        # Journalisation
+        rv$logs <- c(rv$logs, paste("Données traitées :", Sys.time()))
+      }
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  
+  # Initialisation robuste des reactiveValues
+  rv <- reactiveValues(
+    data = list(placeholder = TRUE),  # Liste initialisée avec un élément
+    logs = character(0)               # Vecteur vide pour les logs
+  )
+  
+  observeEvent(input$process, {
+    # Créez toujours des listes complètes
+    safe_list <- list(
+      part1 = if(exists("input$value1")) input$value1 else "default1",
+      part2 = if(!is.null(input$value2)) input$value2 else "default2"
+    )
+    
+    # Filtrage des éléments vides
+    rv$data <- safe_list[lengths(safe_list) > 0]
+  })
   # Fonctions utilitaires
   showLoader <- function() {
     shinyjs::html(id = "loading-content", 
@@ -486,15 +583,26 @@ server <- function(input, output, session) {
   })
   
   # Nettoyage datetime
+ 
   observeEvent(input$clean_datetime, {
     req(rv$clean_data, input$datetime_col)
     tryCatch({
-      rv$clean_data <- rv$clean_data %>%
-        mutate(!!sym(input$datetime_col) := lubridate::ymd_hms(!!sym(input$datetime_col)))
-      showNotification("Dates/heures nettoyées", type = "message")
-      beepr::beep(10)
+      col_name <- input$datetime_col
+      date_data <- rv$clean_data[[col_name]]
+      
+      # Essai de plusieurs formats de date
+      parsed <- parse_date_time(date_data, 
+                                orders = c("ymd HMS", "dmy HMS", "mdy HMS", "ymd", "dmy", "mdy"))
+      
+      if(any(is.na(parsed))) {
+        showNotification("Certaines dates n'ont pas pu être converties", type = "warning")
+      }
+      
+      rv$clean_data[[col_name]] <- parsed
+      showNotification("Conversion de date effectuée", type = "message")
+      
     }, error = function(e) {
-      showNotification(paste("Erreur:", e$message), type = "error")
+      showNotification(paste("Erreur conversion date:", e$message), type = "error")
     })
   })
   
@@ -554,17 +662,19 @@ server <- function(input, output, session) {
   observeEvent(input$find_dupes, {
     req(rv$clean_data, input$dupe_cols)
     tryCatch({
-      rv$dupes_data <- rv$clean_data %>% 
-        janitor::get_dupes(!!!syms(input$dupe_cols)) %>% 
-        arrange(desc(dupe_count))
-      
-      showNotification(
-        paste(nrow(rv$dupes_data), "doublons identifiés"), 
-        type = "message"
-      )
-      beepr::beep(10)
+      if(length(input$dupe_cols) > 0) {
+        dupes <- rv$clean_data %>% 
+          janitor::get_dupes(!!!syms(input$dupe_cols))
+        
+        if(nrow(dupes) > 0) {
+          rv$dupes_data <- dupes %>% arrange(desc(dupe_count))
+        } else {
+          showNotification("Aucun doublon trouvé pour les colonnes sélectionnées", type = "message")
+          rv$dupes_data <- NULL
+        }
+      }
     }, error = function(e) {
-      showNotification(paste("Erreur:", e$message), type = "error")
+      showNotification(paste("Erreur recherche doublons:", e$message), type = "error")
     })
   })
   
@@ -743,22 +853,52 @@ server <- function(input, output, session) {
                                         "<br><sup>", nrow(rv$clean_data), " observations</sup>")))
   })
   
-  output$download_data <- downloadHandler(
+  output$download_report <- downloadHandler(
     filename = function() {
-      paste(input$export_filename, ".", input$export_format, sep = "")
+      paste0("rapport-", Sys.Date(), ".html")
     },
     content = function(file) {
+      # Préparation sécurisée des paramètres
+      params <- safe_list(
+        logs = rv$logs,
+        date = Sys.Date(),
+        data_sample = if(!is.null(rv$clean_data)) head(rv$clean_data, 10)
+      )
+      
+      rmarkdown::render(
+        input = "rapport.Rmd",
+        output_file = file,
+        params = params,
+        envir = new.env()
+      )
+    }
+  )
+  
+  output$download_data <- downloadHandler(
+    filename = function() {
+      paste(input$export_filename, 
+            switch(input$export_format,
+                   "csv" = ".csv",
+                   "xlsx" = ".xlsx",
+                   "rds" = ".rds",
+                   "sav" = ".sav",
+                   "json" = ".json"),
+            sep = "")
+    },
+    content = function(file) {
+      req(rv$clean_data)
+      
       tryCatch({
         switch(input$export_format,
-               csv = write.csv(rv$clean_data, file, row.names = FALSE),
-               xlsx = writexl::write_xlsx(rv$clean_data, file),
-               rds = saveRDS(rv$clean_data, file),
-               sav = haven::write_sav(rv$clean_data, file),
-               json = jsonlite::write_json(rv$clean_data, file)
+               "csv" = write.csv(rv$clean_data, file, row.names = FALSE),
+               "xlsx" = writexl::write_xlsx(list("Data" = rv$clean_data), file),
+               "rds" = saveRDS(rv$clean_data, file),
+               "sav" = haven::write_sav(rv$clean_data, file),
+               "json" = jsonlite::write_json(rv$clean_data, file)
         )
-        beepr::beep(10)
+        showNotification("Export réussi!", type = "message")
       }, error = function(e) {
-        showNotification(paste("Erreur lors de l'export:", e$message), type = "error")
+        showNotification(paste("Erreur :", e$message), type = "error")
       })
     }
   )
@@ -777,6 +917,164 @@ server <- function(input, output, session) {
     updateSelectizeInput(session, "tabyl_vars", choices = character(0))
     beepr::beep(10)
   })
+  
+  # Nettoyage des noms
+  # Nettoyage des noms
+  observeEvent(input$clean_names, {
+    req(rv$clean_data)
+    tryCatch({
+      rv$clean_data <- janitor::clean_names(rv$clean_data)
+      log_action <- function(message) {
+        if (!is.null(message) && is.character(message) && nzchar(message)) {
+          timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+          rv$logs <- c(rv$logs, paste0(timestamp, " - ", message))
+        }
+      }
+      showNotification("✔ Noms nettoyés", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  # Suppression des lignes/colonnes vides
+  observeEvent(input$remove_empty, {
+    req(rv$clean_data)
+    tryCatch({
+      rv$clean_data <- janitor::remove_empty(rv$clean_data, c("rows", "cols"))
+      log_action("🗑️ Lignes et colonnes vides supprimées (janitor::remove_empty)")
+      showNotification("✔ Suppression des vides effectuée", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  # Colonnes constantes
+  observeEvent(input$remove_constant, {
+    req(rv$clean_data)
+    tryCatch({
+      rv$clean_data <- janitor::remove_constant(rv$clean_data)
+      log_action("🔁 Colonnes constantes supprimées (janitor::remove_constant)")
+      showNotification("✔ Suppression des constantes effectuée", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  # Nettoyage des facteurs
+  observeEvent(input$clean_factors, {
+    req(rv$clean_data)
+    tryCatch({
+      rv$clean_data <- rv$clean_data %>%
+        mutate(across(where(is.factor), janitor::make_clean_names))
+      log_action("🏷️ Facteurs nettoyés (make_clean_names sur facteurs)")
+      showNotification("✔ Facteurs nettoyés", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  # Arrondi numérique
+  observeEvent(input$round_numeric, {
+    req(rv$clean_data)
+    tryCatch({
+      digits <- input$round_digits
+      rv$clean_data <- rv$clean_data %>%
+        mutate(across(where(is.numeric), ~round(., digits)))
+      log_action(paste0("🧮 Nombres arrondis à ", digits, " décimales"))
+      showNotification("✔ Nombres arrondis", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  # Conversion en NA
+  observeEvent(input$convert_to_na, {
+    req(rv$clean_data)
+    tryCatch({
+      na_strings <- strsplit(input$na_strings, ",\\s*")[[1]] %>% trimws()
+      rv$clean_data <- rv$clean_data %>%
+        mutate(across(everything(), ~replace(., . %in% na_strings, NA)))
+      log_action(paste("🔄 Valeurs converties en NA :", paste(na_strings, collapse = ", ")))
+      showNotification("✔ Valeurs converties en NA", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  # Supprimer colonnes avec NA
+  observeEvent(input$remove_na_cols, {
+    req(rv$clean_data)
+    tryCatch({
+      rv$clean_data <- janitor::remove_empty(rv$clean_data, "cols")
+      log_action("❌ Colonnes avec NA supprimées (via remove_empty cols)")
+      showNotification("✔ Colonnes avec NA supprimées", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  # Colonnes à valeur unique
+  observeEvent(input$remove_single_value, {
+    req(rv$clean_data)
+    tryCatch({
+      rv$clean_data <- janitor::remove_constant(rv$clean_data)
+      log_action("🔂 Colonnes à valeur unique supprimées (remove_constant)")
+      showNotification("✔ Colonnes à valeur unique supprimées", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
+  # Nettoyage datetime
+  observeEvent(input$clean_datetime, {
+    req(rv$clean_data, input$datetime_col)
+    
+    tryCatch({
+      col_name <- input$datetime_col
+      date_data <- rv$clean_data[[col_name]]
+      
+      # Essai progressif des formats
+      parsed <- parse_date_time(
+        date_data,
+        orders = c("ymd HMS", "ymd HM", "ymd", "dmy HMS", "dmy HM", "dmy"),
+        quiet = TRUE
+      )
+      
+      if(all(is.na(parsed))) {
+        showNotification("Aucun format de date reconnu. Conservation des valeurs originales.", 
+                         type = "warning")
+      } else {
+        rv$clean_data[[col_name]] <- parsed
+        showNotification("Conversion de date réussie", type = "message")
+      }
+      
+    }, error = function(e) {
+      showNotification(paste("Erreur conversion date:", e$message), type = "error")
+    })
+  })
+  
+  # Uniformisation de la casse
+  observeEvent(input$clean_case, {
+    req(rv$clean_data)
+    tryCatch({
+      rv$clean_data <- rv$clean_data %>%
+        mutate(across(where(is.character), ~stringr::str_to_lower(.)))
+      log_action("🔤 Casse uniformisée (str_to_lower sur chaînes)")
+      showNotification("✔ Casse uniformisée", type = "message")
+      beepr::beep(10)
+    }, error = function(e) {
+      showNotification(paste("Erreur :", e$message), type = "error")
+    })
+  })
+  
 }
 
 # 4. Lancement de l'application ----
