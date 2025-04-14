@@ -3,7 +3,7 @@
 # Installation et chargement des packages nécessaires
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(
-  shiny, shinyjs, shinyWidgets, shinycssloaders, fontawesome, bslib,
+  shiny, shinyjs, shinyWidgets, shinycssloaders, fontawesome, bslib,fst,
   janitor, dplyr, tidyr, readr, readxl, haven, data.table, rio, jsonlite,
   stringr, forcats, ggplot2, plotly, DT, lubridate, rmarkdown, writexl, beepr
 )
