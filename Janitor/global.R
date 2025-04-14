@@ -12,17 +12,21 @@ pacman::p_load(
 options(future.globals.maxSize = 16000 * 1024^2)  # 16GB
 
 # Chargement des fonctions auxiliaires
-source("modules/helpers.R")
+#source("modules/helpers.R")
 
 # Liste des fonctions janitor disponibles
 janitor_functions <- sort(ls("package:janitor")[!grepl("^\\.", ls("package:janitor"))])
 
 # Initialisation des valeurs réactives
 rv <- reactiveValues(
-  raw_data = NULL,
-  clean_data = NULL,
-  tabyl_data = NULL,
-  dupes_data = NULL,
-  comparison_data = NULL,
-  logs = character(0)
+  data = data.frame(),  # Toujours initialiser avec une structure vide appropriée
+  results = list(valid = TRUE),  # Liste avec élément par défaut
+  logs = character(0)   # Vecteur vide pour les logs
 )
+
+log_action <- function(message) {
+  if (!is.null(message) && is.character(message) && nzchar(message)) {
+    rv$logs <- c(rv$logs, paste(Sys.time(), "-", message))
+  }
+}
+

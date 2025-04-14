@@ -1,50 +1,67 @@
 # server/server_clean_base.R
 
+# Nettoyage des noms
 observeEvent(input$clean_names, {
   req(rv$clean_data)
   tryCatch({
     rv$clean_data <- janitor::clean_names(rv$clean_data)
+    log_action <- function(message) {
+      if (!is.null(message) && is.character(message) && nzchar(message)) {
+        timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+        rv$logs <- c(rv$logs, paste0(timestamp, " - ", message))
+      }
+    }
     showNotification("✔ Noms nettoyés", type = "message")
     beepr::beep(10)
   }, error = function(e) {
-    showNotification(paste("Erreur:", e$message), type = "error")
+    showNotification(paste("Erreur :", e$message), type = "error")
   })
 })
 
+# Suppression des lignes/colonnes vides
 observeEvent(input$remove_empty, {
   req(rv$clean_data)
   tryCatch({
     rv$clean_data <- janitor::remove_empty(rv$clean_data, c("rows", "cols"))
+    log_action("🗑️ Lignes et colonnes vides supprimées (janitor::remove_empty)")
     showNotification("✔ Suppression des vides effectuée", type = "message")
     beepr::beep(10)
   }, error = function(e) {
-    showNotification(paste("Erreur:", e$message), type = "error")
+    showNotification(paste("Erreur :", e$message), type = "error")
   })
 })
 
+
+
+# Colonnes constantes
 observeEvent(input$remove_constant, {
   req(rv$clean_data)
   tryCatch({
     rv$clean_data <- janitor::remove_constant(rv$clean_data)
+    log_action("🔁 Colonnes constantes supprimées (janitor::remove_constant)")
     showNotification("✔ Suppression des constantes effectuée", type = "message")
     beepr::beep(10)
   }, error = function(e) {
-    showNotification(paste("Erreur:", e$message), type = "error")
+    showNotification(paste("Erreur :", e$message), type = "error")
   })
 })
 
+# Nettoyage des facteurs
 observeEvent(input$clean_factors, {
   req(rv$clean_data)
   tryCatch({
     rv$clean_data <- rv$clean_data %>%
       mutate(across(where(is.factor), janitor::make_clean_names))
+    log_action("🏷️ Facteurs nettoyés (make_clean_names sur facteurs)")
     showNotification("✔ Facteurs nettoyés", type = "message")
     beepr::beep(10)
   }, error = function(e) {
-    showNotification(paste("Erreur:", e$message), type = "error")
+    showNotification(paste("Erreur :", e$message), type = "error")
   })
 })
 
+
+# Conversion des dates Excel
 observeEvent(input$convert_date, {
   tryCatch({
     excel_date <- input$excel_date
