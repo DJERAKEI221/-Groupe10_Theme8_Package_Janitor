@@ -44,8 +44,6 @@ Voici quelques ressources pour approfondir l'utilisation du package `janitor` et
 
 Ce projet a été réalisé par :
 
-- **Hildegarde EDIMA BIYENDA**  
-  [email](eddiebugb@gmail.com)  
-
-- **Djerakei MISTALENGAR**  
-  [email](yvesdjerake@gmail.com)
+- **Hildegarde EDIMA BIYENDA: ** [mail](eddiebugb@gmail.com)  
+  
+- **Djerakei MISTALENGAR: ** [mail](yvesdjerake@gmail.com)
