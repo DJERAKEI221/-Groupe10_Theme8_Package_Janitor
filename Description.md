@@ -32,7 +32,7 @@ Application Shiny interactive pour le nettoyage et la préparation de données u
 
 ## Ressources utiles
 
-Voici quelques ressources pour approfondir l'utilisation du package `janitor` et découvrir des contenus liés au nettoyage et à la science des données avec R :
+Voici quelques ressources pour l'utilisation du package `janitor`:
 
 - [Documentation officielle du package janitor](https://sfirke.github.io/janitor/)
 - [Fiche janitor sur RDocumentation](https://rdocumentation.org/packages/janitor/versions/0.3.0)
