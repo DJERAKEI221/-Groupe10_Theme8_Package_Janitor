@@ -30,7 +30,7 @@ Application Shiny interactive pour le nettoyage et la préparation de données u
 - **Serveur** : Gestion réactive des données
 
 
-## Ressources utiles
+### Ressources utiles
 
 Voici quelques ressources pour l'utilisation du package `janitor`:
 

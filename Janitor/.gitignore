@@ -1,0 +1,22 @@
+# Fichiers RStudio
+.Rproj.user/
+*.Rproj
+
+# Fichiers R temporaires
+.Rhistory
+.RData
+.Ruserdata
+.Rapp.history
+
+# Fichiers d'environnement
+.Renviron
+.Rprofile
+
+# Fichiers générés par les notebooks ou chunks
+*_cache/
+*cache/
+*.utf8.md
+*.knit.md
+*.nb.html
+
+
