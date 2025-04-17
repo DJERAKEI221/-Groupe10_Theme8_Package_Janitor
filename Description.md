@@ -34,11 +34,11 @@ Application Shiny interactive pour le nettoyage et la préparation de données u
 
 Voici quelques ressources pour l'utilisation du package `janitor`:
 
-- [Cours de projet-statistique-sous-R dispensé par ** M. Aboubacar HEMA** ](https://github.com/Abson-dev/Projet-statistique-sous-R/tree/main)
+- [Cours de projet-statistique-sous-R dispensé par M. Aboubacar HEMA (ENSAE-Dakar)](https://github.com/Abson-dev/Projet-statistique-sous-R/tree/main)
 - [Documentation officielle du package janitor](https://sfirke.github.io/janitor/)
 - [Fiche janitor sur RDocumentation](https://rdocumentation.org/packages/janitor/versions/0.3.0)
 - [Tutoriels R sur DellaData.fr](https://delladata.fr/)
-- [Cours et ressources R de ** Lise Vaudor (ENS Lyon)** ](https://perso.ens-lyon.fr/lise.vaudor/)
+- [Cours et ressources R de Lise Vaudor (ENS Lyon)](https://perso.ens-lyon.fr/lise.vaudor/)
 
 
 
