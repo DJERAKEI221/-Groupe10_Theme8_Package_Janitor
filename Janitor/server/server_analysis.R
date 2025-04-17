@@ -63,6 +63,21 @@ output$tabyl_table <- renderDT({
   ) 
 })
 
+output$comparison_table <- renderDT({
+  req(rv$comparison_data)
+  datatable(rv$comparison_data, 
+            options = list(
+              scrollX = TRUE, 
+              pageLength = 5,
+              dom = 'Bfrtip',
+              buttons = c('copy', 'csv', 'excel')
+            ),
+            extensions = 'Buttons',
+            rownames = FALSE
+  )
+})
+
+
 output$data_plot <- renderPlotly({
   req(rv$clean_data, input$plot_var)
   

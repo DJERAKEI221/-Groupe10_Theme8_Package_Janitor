@@ -90,6 +90,23 @@ observeEvent(input$find_dupes, {
   })
 })
 
+output$clean_table <- renderDT({
+  req(rv$clean_data)
+  datatable(rv$clean_data, 
+            options = list(
+              scrollX = TRUE, 
+              pageLength = 5,
+              dom = 'Bfrtip',
+              buttons = c('copy', 'csv', 'excel')
+            ),
+            extensions = 'Buttons',
+            rownames = FALSE
+  )
+})
+
+
+  
+
 output$dupes_table <- renderDT({
   req(rv$dupes_data)
   datatable(rv$dupes_data,

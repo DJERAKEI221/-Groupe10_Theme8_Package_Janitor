@@ -12,7 +12,6 @@ pacman::p_load(
 options(future.globals.maxSize = 16000 * 1024^2)  # 16GB
 
 # Chargement des fonctions auxiliaires
-#source("modules/helpers.R")
 
 # Liste des fonctions janitor disponibles
 janitor_functions <- sort(ls("package:janitor")[!grepl("^\\.", ls("package:janitor"))])
